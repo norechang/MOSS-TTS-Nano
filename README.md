@@ -70,6 +70,7 @@ MOSS-TTS 2.0 is coming soon. To better optimize model capabilities and product e
   - [Export TTS-only ONNX Weights](#export-tts-only-onnx-weights)
   - [CLI Command: `moss-tts-nano generate`](#cli-command-moss-tts-nano-generate)
   - [CLI Command: `moss-tts-nano serve`](#cli-command-moss-tts-nano-serve)
+  - [API Service (Async TTS API)](#api-service)
   - [Finetuning](#finetuning)
 - [MOSS-Audio-Tokenizer-Nano](#moss-audio-tokenizer-nano)
 - [MOSS-TTS Family](#moss-tts)
@@ -341,6 +342,60 @@ moss-tts-nano serve \
 This command forwards to the corresponding web app, keeps the model loaded in memory, and serves the local browser demo plus HTTP generation endpoints.
 
 For server deployment with paged KV cache, streaming, and an OpenAI-compatible `/v1/audio/speech` endpoint, please read the [vLLM-Omni MOSS-TTS-Nano README](https://github.com/vllm-project/vllm-omni/blob/main/examples/online_serving/moss_tts_nano/README.md).
+
+<a id="api-service"></a>
+
+### API Service (Async TTS API)
+
+We provide a lightweight, production-ready asynchronous API service for MOSS-TTS-Nano. This service is designed for easy integration with other applications and supports both CPU (ONNX) and GPU (PyTorch) backends.
+
+**Key Features**:
+- Asynchronous job processing (submit → poll → download)
+- Single-slot execution model (one job at a time)
+- RESTful API with OpenAPI/Swagger documentation
+- Docker containerized deployment
+- Automatic file cleanup with configurable TTL
+- Support for voice cloning and preset voices
+
+**Quick Start**:
+
+```bash
+# Run with Docker (CPU backend)
+docker-compose up -d
+
+# Or run directly with Python
+python api_service.py --backend onnx --device cpu
+```
+
+**Basic Usage**:
+
+```python
+import requests
+import time
+
+# Submit job
+response = requests.post(
+    "http://localhost:8000/api/v1/generate",
+    json={"text": "Hello world", "voice": "Ava"}
+)
+job_id = response.json()["job_id"]
+
+# Poll status
+while True:
+    status = requests.get(f"http://localhost:8000/api/v1/status/{job_id}").json()
+    if status["status"] == "completed":
+        break
+    time.sleep(1)
+
+# Download result
+audio = requests.get(f"http://localhost:8000/api/v1/result/{job_id}")
+with open("output.wav", "wb") as f:
+    f.write(audio.content)
+```
+
+**Full API Documentation**: See [API.md](./API.md) for complete API reference, endpoints, configuration options, and advanced examples.
+
+**Design Documentation**: See [AGENTS.md](./AGENTS.md) for architectural decisions and design principles.
 
 ### Finetuning
 

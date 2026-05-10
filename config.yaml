@@ -1,0 +1,94 @@
+# MOSS-TTS-Nano API Service Configuration
+
+# Service settings
+service:
+  host: 0.0.0.0
+  port: 8000
+  title: "MOSS-TTS-Nano API"
+  description: "Lightweight asynchronous TTS API service"
+  version: "0.1.0"
+
+# Processing settings
+processing:
+  # Backend: 'onnx' (CPU-optimized, 2x faster) or 'pytorch' (GPU-optimized)
+  backend: onnx
+  
+  # Device: 'cpu' or 'cuda' (for GPU)
+  device: cpu
+  
+  # CPU threads (only for PyTorch backend)
+  cpu_threads: 4
+  
+  # Execution provider for ONNX backend: 'cpu' or 'cuda'
+  execution_provider: cpu
+  
+  # Model paths (will auto-download if not found)
+  model_dir: null  # null means use default ./models/
+  checkpoint_path: null  # null means use default
+  audio_tokenizer_path: null  # null means use default
+
+# Storage settings
+storage:
+  # Directory for generated audio files
+  output_dir: ./generated_audio
+  
+  # Directory for uploaded reference audio
+  upload_dir: ./uploads
+  
+  # How long to keep generated files (in hours)
+  retention_hours: 1.0
+  
+  # Maximum upload file size (in MB)
+  max_upload_size_mb: 10
+
+# Default generation parameters
+defaults:
+  voice: Junhao
+  max_new_frames: 375
+  voice_clone_max_text_tokens: 75
+  do_sample: true
+  text_temperature: 1.0
+  text_top_p: 1.0
+  text_top_k: 50
+  audio_temperature: 0.8
+  audio_top_p: 0.95
+  audio_top_k: 25
+  audio_repetition_penalty: 1.2
+
+# Request limits
+limits:
+  # Maximum text length (in characters)
+  max_text_length: 5000
+  
+  # Request timeout (in seconds)
+  request_timeout_seconds: 300
+
+# CORS settings
+cors:
+  # Allow CORS (for web applications)
+  enabled: true
+  
+  # Allowed origins (* means all origins)
+  origins:
+    - "*"
+  
+  # Allowed methods
+  methods:
+    - "GET"
+    - "POST"
+    - "DELETE"
+  
+  # Allowed headers
+  headers:
+    - "*"
+
+# Logging settings
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  
+  # Log format: 'json' or 'text'
+  format: text
+  
+  # Log file path (null means stdout only)
+  file: null

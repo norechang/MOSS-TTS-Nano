@@ -1,0 +1,32 @@
+service:
+  host: "0.0.0.0"
+  port: 8007
+
+processing:
+  backend: "pytorch"
+  device: "cpu"
+  dtype: "float32"
+  cpu_threads: 4
+
+storage:
+  output_dir: "./generated_audio"
+  upload_dir: "./uploads"
+  retention_hours: 1.0
+  max_upload_size_mb: 10
+
+defaults:
+  voice: "Junhao"
+  max_new_frames: 375
+  voice_clone_max_text_tokens: 75
+  do_sample: true
+  text_temperature: 1.0
+  text_top_p: 1.0
+  text_top_k: 50
+  audio_temperature: 0.8
+  audio_top_p: 0.95
+  audio_top_k: 25
+  audio_repetition_penalty: 1.2
+
+limits:
+  max_text_length: 5000
+  request_timeout_seconds: 300

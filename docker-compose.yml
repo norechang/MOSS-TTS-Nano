@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  moss-tts-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: moss-tts-nano-api
+    ports:
+      - "8002:8000"
+    volumes:
+      # Persist generated audio and uploads
+      - ./generated_audio:/app/generated_audio
+      - ./uploads:/app/uploads
+      # Optional: Mount config file
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      # Processing backend: onnx (CPU-optimized) or pytorch (GPU)
+      - PROCESSING_BACKEND=onnx
+      # Device: cpu or cuda
+      - PROCESSING_DEVICE=cpu
+      # Service port
+      - SERVICE_PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # GPU-enabled variant (uncomment to use)
+  # moss-tts-api-gpu:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.api
+  #   container_name: moss-tts-nano-api-gpu
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./generated_audio:/app/generated_audio
+  #     - ./uploads:/app/uploads
+  #     - ./config.yaml:/app/config.yaml:ro
+  #   environment:
+  #     - PROCESSING_BACKEND=pytorch
+  #     - PROCESSING_DEVICE=cuda
+  #     - SERVICE_PORT=8000
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   restart: unless-stopped
+
+networks:
+  default:
+    name: moss-tts-network
