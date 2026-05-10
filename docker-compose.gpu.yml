@@ -1,41 +1,46 @@
+# Docker Compose configuration for GPU-enabled deployment
+# This file provides multiple GPU configuration options for different Docker setups
+#
+# Usage:
+#   docker compose -f docker-compose.gpu.yml up -d
+
 version: '3.8'
 
 services:
-  moss-tts-api:
+  # Option 1: Using runtime: nvidia (recommended for Docker 19.03+)
+  moss-tts-api-gpu-runtime:
     build:
       context: .
       dockerfile: Dockerfile.api
-    container_name: moss-tts-nano-api
+    container_name: moss-tts-nano-api-gpu
+    runtime: nvidia
     ports:
-      - "8002:8000"
+      - "8000:8000"
     volumes:
-      # Persist generated audio and uploads
       - ./generated_audio:/app/generated_audio
       - ./uploads:/app/uploads
-      # Optional: Mount config file
-      - ./config.yaml:/app/config.yaml:ro
+      - ./config_pytorch_cuda_fp32.yaml:/app/config.yaml:ro
     environment:
-      # Processing backend: onnx (CPU-optimized) or pytorch (GPU)
-      - PROCESSING_BACKEND=onnx
-      # Device: cpu or cuda
-      - PROCESSING_DEVICE=cpu
-      # Service port
+      - PROCESSING_BACKEND=pytorch
+      - PROCESSING_DEVICE=cuda
       - SERVICE_PORT=8000
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
-  # GPU-enabled variant (uncomment to use)
-  # moss-tts-api-gpu:
+  # Option 2: Using deploy.resources (Docker Compose v1.28.0+)
+  # Uncomment this section if runtime: nvidia doesn't work
+  # moss-tts-api-gpu-deploy:
   #   build:
   #     context: .
   #     dockerfile: Dockerfile.api
   #   container_name: moss-tts-nano-api-gpu
-  #   runtime: nvidia  # Use nvidia runtime instead of deploy.resources for better compatibility
   #   ports:
   #     - "8000:8000"
   #   volumes:
@@ -46,15 +51,20 @@ services:
   #     - PROCESSING_BACKEND=pytorch
   #     - PROCESSING_DEVICE=cuda
   #     - SERVICE_PORT=8000
-  #     - NVIDIA_VISIBLE_DEVICES=all
-  #     - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
   #   restart: unless-stopped
   #   healthcheck:
   #     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
   #     interval: 30s
   #     timeout: 10s
   #     retries: 3
-  #     start_period: 60s  # Longer for GPU model loading
+  #     start_period: 60s
 
 networks:
   default:

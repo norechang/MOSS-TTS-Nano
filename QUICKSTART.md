@@ -13,18 +13,45 @@ This guide helps you quickly deploy and test the MOSS-TTS-Nano API service.
 
 ### 1. Start the Service
 
+#### Option A: CPU Backend (ONNX)
 ```bash
-# Start with CPU backend (ONNX)
-docker-compose up -d
+# Start with CPU backend (ONNX) - recommended for CPU-only servers
+docker compose up -d
 
 # Or build and start
-docker-compose up --build -d
+docker compose up --build -d
 ```
+
+#### Option B: GPU Backend (PyTorch CUDA)
+```bash
+# Start with GPU backend (PyTorch CUDA)
+docker compose -f docker-compose.gpu.yml up -d
+
+# Or build and start
+docker compose -f docker-compose.gpu.yml up --build -d
+```
+
+**Note**: For GPU deployment, see [GPU_DEPLOYMENT.md](./GPU_DEPLOYMENT.md) for detailed setup instructions and troubleshooting.
 
 ### 2. Check Service Health
 
 ```bash
+# For CPU deployment
+curl http://localhost:8002/health
+
+# For GPU deployment
 curl http://localhost:8000/health
+```
+
+Expected response:
+```json
+{
+  "status": "healthy",
+  "service": "moss-tts-nano-api",
+  "backend": "onnx",  // or "pytorch"
+  "device": "cpu",    // or "cuda"
+  "slot_status": "idle"
+}
 ```
 
 ### 3. Test the API
