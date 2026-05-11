@@ -393,9 +393,14 @@ with open("output.wav", "wb") as f:
     f.write(audio.content)
 ```
 
-**Full API Documentation**: See [API.md](./API.md) for complete API reference, endpoints, configuration options, and advanced examples.
+**Documentation**:
+- **[README_API.md](./README_API.md)** - API service overview and getting started
+- **[API.md](./API.md)** - Complete API specification (authoritative reference)
+- **[QUICKSTART.md](./QUICKSTART.md)** - Quick start guide for deployment
+- **[GPU_DEPLOYMENT.md](./GPU_DEPLOYMENT.md)** - GPU deployment guide and troubleshooting
+- **[AGENTS.md](./AGENTS.md)** - Architectural decisions and design principles (for maintainers)
 
-**Design Documentation**: See [AGENTS.md](./AGENTS.md) for architectural decisions and design principles.
+**Testing**: Run the validation test suite in `api_validate/` to verify all endpoints match the specification.
 
 ### Finetuning
 
