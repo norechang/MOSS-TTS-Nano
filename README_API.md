@@ -18,6 +18,7 @@ The MOSS-TTS-Nano API Service provides a production-ready, asynchronous RESTful 
 ### Supporting Documentation
 - **[QUICKSTART.md](./QUICKSTART.md)** - Getting started guide for users
 - **[GPU_DEPLOYMENT.md](./GPU_DEPLOYMENT.md)** - GPU deployment guide
+- **[GPU_MEMORY_MANAGEMENT.md](./GPU_MEMORY_MANAGEMENT.md)** - GPU memory management implementation details
 - **[AGENTS.md](./AGENTS.md)** - Design decisions and architectural constraints (for maintainers)
 - **[KNOWN_ISSUES.md](./KNOWN_ISSUES.md)** - Troubleshooting guide
 

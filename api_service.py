@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import gc
 import io
 import logging
 import os
@@ -80,6 +81,8 @@ class ServiceConfig:
                 "audio_tokenizer_path": None,
                 "dtype": "auto",
                 "attn_implementation": "auto",
+                "clear_cache_before_generation": True,
+                "clear_cache_after_generation": True,
             },
             "storage": {
                 "output_dir": "./generated_audio",
@@ -187,6 +190,61 @@ class GenerateRequest(BaseModel):
 # ============================================================================
 # TTS Runtime Manager
 # ============================================================================
+
+def clear_gpu_cache(device: str = "cpu", force: bool = False):
+    """
+    Clear GPU memory cache and Python garbage.
+    
+    Args:
+        device: Device type ('cpu', 'cuda', 'mps')
+        force: Force aggressive cache clearing even on CPU
+    """
+    # Always run garbage collection
+    gc.collect()
+    
+    # Clear CUDA cache if using GPU
+    if device.startswith("cuda"):
+        try:
+            import torch
+            if torch.cuda.is_available():
+                # Log memory before clearing
+                allocated_before = torch.cuda.memory_allocated() / 1024**2  # MB
+                reserved_before = torch.cuda.memory_reserved() / 1024**2  # MB
+                
+                # Clear cache and synchronize
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                
+                # Log memory after clearing
+                allocated_after = torch.cuda.memory_allocated() / 1024**2  # MB
+                reserved_after = torch.cuda.memory_reserved() / 1024**2  # MB
+                
+                freed_allocated = allocated_before - allocated_after
+                freed_reserved = reserved_before - reserved_after
+                
+                logging.info(
+                    f"CUDA cache cleared: allocated {allocated_before:.1f}MB -> {allocated_after:.1f}MB "
+                    f"(freed {freed_allocated:.1f}MB), reserved {reserved_before:.1f}MB -> {reserved_after:.1f}MB "
+                    f"(freed {freed_reserved:.1f}MB)"
+                )
+        except ImportError:
+            pass
+    
+    # Clear MPS cache for Apple Silicon
+    elif device == "mps":
+        try:
+            import torch
+            if hasattr(torch.mps, 'empty_cache'):
+                torch.mps.empty_cache()
+                logging.debug("Cleared MPS cache")
+        except (ImportError, AttributeError):
+            pass
+    
+    # For CPU or force mode, run additional garbage collection
+    if force or device == "cpu":
+        gc.collect()
+        logging.debug("Ran garbage collection")
+
 
 class TTSRuntimeManager:
     """Manages TTS runtime initialization and execution."""
@@ -297,16 +355,33 @@ class TTSRuntimeManager:
         """
         Synthesize speech with the loaded runtime.
         
+        Automatically clears GPU/CPU cache before and after generation
+        to prevent memory accumulation issues.
+        
         Returns:
             Dictionary with generation results
         """
-        # Merge options with defaults
-        gen_options = self._merge_options(options)
+        # Clear cache before synthesis to free up memory
+        if self.config.get("processing", "clear_cache_before_generation"):
+            clear_gpu_cache(self.device, force=False)
+            logging.debug(f"Cleared cache before generation (device={self.device})")
         
-        if self.backend == "onnx":
-            return self._synthesize_onnx(text, voice, reference_audio_path, gen_options, output_path)
-        else:
-            return self._synthesize_pytorch(text, voice, reference_audio_path, gen_options, output_path)
+        try:
+            # Merge options with defaults
+            gen_options = self._merge_options(options)
+            
+            if self.backend == "onnx":
+                result = self._synthesize_onnx(text, voice, reference_audio_path, gen_options, output_path)
+            else:
+                result = self._synthesize_pytorch(text, voice, reference_audio_path, gen_options, output_path)
+            
+            return result
+            
+        finally:
+            # Always clear cache after synthesis, even if there was an error
+            if self.config.get("processing", "clear_cache_after_generation"):
+                clear_gpu_cache(self.device, force=True)
+                logging.debug(f"Cleared cache after generation (device={self.device})")
     
     def _merge_options(self, options: Optional[GenerationOptions]) -> dict:
         """Merge request options with defaults."""

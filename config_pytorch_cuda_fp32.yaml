@@ -8,6 +8,8 @@ processing:
   dtype: "float32"  # Force float32 instead of bfloat16 to avoid numerical instability
   cpu_threads: 4
   execution_provider: "cuda"
+  clear_cache_before_generation: true  # Clear GPU cache before each generation
+  clear_cache_after_generation: true   # Clear GPU cache after each generation
 
 storage:
   output_dir: "./generated_audio"
