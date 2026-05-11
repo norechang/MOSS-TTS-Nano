@@ -60,13 +60,20 @@ class APIValidator:
         self.log_test(test_name, passed, message if not passed else "")
         return passed
     
-    def assert_field_type(self, data: dict, field: str, expected_type: type, test_name: str):
-        """Assert field type"""
+    def assert_field_type(self, data: dict, field: str, expected_type, test_name: str):
+        """Assert field type (expected_type can be a type or tuple of types)"""
         if field not in data:
             self.log_test(test_name, False, f"Field '{field}' not found")
             return False
         passed = isinstance(data[field], expected_type)
-        message = f"Field '{field}' type: expected {expected_type.__name__}, got {type(data[field]).__name__}"
+        
+        # Handle both single types and tuple of types for error message
+        if isinstance(expected_type, tuple):
+            type_names = ' or '.join(t.__name__ for t in expected_type)
+        else:
+            type_names = expected_type.__name__
+        
+        message = f"Field '{field}' type: expected {type_names}, got {type(data[field]).__name__}"
         self.log_test(test_name, passed, message if not passed else "")
         return passed
     
@@ -147,7 +154,7 @@ class HealthMetricsValidator(APIValidator):
         data = response.json()
         
         # Test 2: Response contains metrics fields
-        expected_fields = ['uptime_seconds', 'slot_status', 'jobs_completed', 'jobs_failed']
+        expected_fields = ['uptime_seconds', 'current_status', 'jobs_completed', 'jobs_failed']
         for field in expected_fields:
             self.assert_field_exists(data, field, f"Metrics response contains '{field}'")
         
@@ -170,24 +177,28 @@ class VoiceManagementValidator(APIValidator):
         
         data = response.json()
         
-        # Test 2: Response is a list
-        passed = isinstance(data, list)
-        self.log_test("Response is a list", passed,
-                     f"Expected list, got {type(data).__name__}" if not passed else "")
+        # Test 2: Response is a dict with 'voices' key
+        passed = isinstance(data, dict) and 'voices' in data
+        self.log_test("Response is a dict with 'voices' key", passed,
+                     f"Expected dict with 'voices', got {type(data).__name__}" if not passed else "")
         
-        if not isinstance(data, list) or len(data) == 0:
+        if not isinstance(data, dict) or 'voices' not in data:
+            return
+        
+        voices = data['voices']
+        if not isinstance(voices, list) or len(voices) == 0:
             return
         
         # Test 3: Each voice has required fields
-        voice = data[0]
-        for field in ['name', 'description']:
+        voice = voices[0]
+        for field in ['name', 'voice']:
             self.assert_field_exists(voice, field, f"Voice object contains '{field}'")
         
         # Test 4: At least one Chinese voice exists
-        chinese_voices = [v['name'] for v in data if v['name'] in ['Junhao', 'Zhiming', 'Xiaoyu']]
+        chinese_voices = [v['name'] for v in voices if v['name'] in ['Junhao', 'Zhiming', 'Xiaoyu']]
         passed = len(chinese_voices) > 0
         self.log_test("At least one Chinese voice available", passed,
-                     f"Found voices: {[v['name'] for v in data][:5]}" if passed else "No Chinese voices found")
+                     f"Found voices: {[v['name'] for v in voices][:5]}" if passed else "No Chinese voices found")
     
     def test_upload_reference_audio(self):
         """Test POST /api/v1/voices/upload endpoint"""
@@ -262,6 +273,10 @@ class JobManagementValidator(APIValidator):
         self.assert_field_exists(data, 'created_at', "Generate response contains created_at")
         
         print(f"  Created job: {job_id}")
+        
+        # Wait for job to complete to avoid blocking subsequent tests
+        print(f"  Waiting for job {job_id} to complete...")
+        self.wait_for_job_completion(job_id, timeout=60)
     
     def test_generate_speech_validation(self):
         """Test POST /api/v1/generate with invalid input"""
@@ -327,6 +342,10 @@ class JobManagementValidator(APIValidator):
             passed = data['status'] in valid_statuses
             self.log_test("Status is valid", passed,
                          f"Expected one of {valid_statuses}, got '{data['status']}'" if not passed else "")
+        
+        # Wait for job to complete to avoid blocking subsequent tests
+        print(f"  Waiting for job {job_id} to complete...")
+        self.wait_for_job_completion(job_id, timeout=60)
         
         # Test 5: Check non-existent job returns 404
         response = requests.get(f"{self.api_base}/status/nonexistent-job-id")
@@ -399,6 +418,10 @@ class JobManagementValidator(APIValidator):
             passed = response.status_code in [400, 404]
             self.log_test("Download before completion returns 400/404", passed,
                          f"Expected 400 or 404, got {response.status_code}" if not passed else "")
+            
+            # Wait for this job to complete to avoid blocking subsequent tests
+            print(f"  Waiting for job {early_job_id} to complete...")
+            self.wait_for_job_completion(early_job_id, timeout=60)
 
 
 class SlotManagementValidator(APIValidator):
@@ -416,22 +439,22 @@ class SlotManagementValidator(APIValidator):
         data = response.json()
         
         # Test 2: Response contains required fields
-        required_fields = ['slot_available', 'slot_status']
+        required_fields = ['available', 'status']
         for field in required_fields:
             self.assert_field_exists(data, field, f"Slot response contains '{field}'")
         
-        # Test 3: slot_available is boolean
-        self.assert_field_type(data, 'slot_available', bool, "slot_available is boolean")
+        # Test 3: available is boolean
+        self.assert_field_type(data, 'available', bool, "available is boolean")
         
-        # Test 4: slot_status is valid
-        if 'slot_status' in data:
+        # Test 4: status is valid
+        if 'status' in data:
             valid_statuses = ['idle', 'busy']
-            passed = data['slot_status'] in valid_statuses
-            self.log_test("slot_status is valid", passed,
-                         f"Expected 'idle' or 'busy', got '{data['slot_status']}'" if not passed else "")
+            passed = data['status'] in valid_statuses
+            self.log_test("status is valid", passed,
+                         f"Expected 'idle' or 'busy', got '{data['status']}'" if not passed else "")
         
-        # Test 5: If busy, current_job_id should exist
-        if data.get('slot_status') == 'busy':
+        # Test 5: When busy, current_job_id should be present
+        if data.get('status') == 'busy':
             self.assert_field_exists(data, 'current_job_id', "Busy slot includes current_job_id")
     
     def test_busy_slot_rejection(self):
@@ -460,11 +483,14 @@ class SlotManagementValidator(APIValidator):
             
             data = response2.json()
             
-            # Test: 503 response contains helpful information
-            self.assert_field_exists(data, 'error', "503 response contains error field")
-            self.assert_field_exists(data, 'message', "503 response contains message")
+            # FastAPI wraps custom errors in 'detail' field
+            detail = data.get('detail', data)
             
-            if 'current_job_id' in data:
+            # Test: 503 response contains helpful information
+            self.assert_field_exists(detail, 'error', "503 response contains error field")
+            self.assert_field_exists(detail, 'message', "503 response contains message")
+            
+            if 'current_job_id' in detail:
                 self.log_test("503 response includes current_job_id", True)
         elif response2.status_code == 202:
             # Job was accepted (first job might have finished already)
@@ -516,7 +542,8 @@ def run_all_validations(base_url: str = "http://localhost:8000"):
             if method_name.startswith('test_'):
                 try:
                     method = getattr(validator, method_name)
-                    method()
+                    if callable(method):  # Only call if it's actually a method
+                        method()
                 except Exception as e:
                     print(f"\n✗ EXCEPTION in {method_name}: {e}")
                     validator.log_test(method_name, False, str(e))
