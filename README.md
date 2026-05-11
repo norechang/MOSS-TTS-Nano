@@ -400,7 +400,10 @@ with open("output.wav", "wb") as f:
 - **[GPU_DEPLOYMENT.md](./GPU_DEPLOYMENT.md)** - GPU deployment guide and troubleshooting
 - **[AGENTS.md](./AGENTS.md)** - Architectural decisions and design principles (for maintainers)
 
-**Testing**: Run the validation test suite in `api_validate/` to verify all endpoints match the specification.
+**Testing & Tools**:
+- **[api_validate/](./api_validate/)** - Comprehensive validation test suite (56 tests covering all endpoints)
+- **[api_gen.sh](./api_gen.sh)** - Convenient script for testing API generation (similar to `gen.sh` but uses API)
+- **[API_GEN_SCRIPT.md](./api_validate/API_GEN_SCRIPT.md)** - Usage guide for `api_gen.sh`
 
 ### Finetuning
 
